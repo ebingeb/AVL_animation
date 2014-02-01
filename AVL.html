@@ -1,0 +1,495 @@
+<meta charset="UTF-8">
+<!doctype html>
+<html>
+<head>
+<title>
+Animated AVL Tree
+</title>
+<script src="jQuery.js">
+</script>
+<script>
+var radius = 40;
+var tree = null;
+var canvas2 = null;
+var canvas3 = null;
+var canvas4 = null;
+var bigArray = [];
+var radiuses = [40,35,30,25,20,18];
+var maxDepth = 0;
+var ctx2 = null;
+var ctx3 = null;
+var ctx4 = null;
+var redo = false;
+var clickables = [];
+var done = false;
+var drawNone = false;
+for (var i = 0; i < 10000; i++) {
+    bigArray.push(i);
+}
+function Clickable(x1, y1, x2, y2, x3, y3, node) {
+	this.x1 = x1;
+	this.y1 = y1;
+	this.x2 = x2;
+	this.y2 = y2;
+	this.x3 = x3;
+	this.y3 = y3;
+	this.node = node;
+}
+Clickable.prototype.isClicked = function(px, py) {
+	var p0x = this.x1;
+	var p0y = this.y1; 
+	var p1x = this.x2;
+	var p1y = this.y2; 
+	var p2x = this.x3; 
+	var p2y = this.y3; 
+	/*var b = (x1 - x0)/(y1 - y0);
+	var t = (x - x0 - y * b + y0 * b)/(x2 - x0 - y2 * b + b * y0);
+	var c = (x2 - x0)/(y2 - y0);
+	var s = (x - x0 - y * c + y0 * c)/(x1 - x0 - y1 * c + c * y0);*/
+	var Area = 1/2*(-p1y*p2x + p0y*(-p1x + p2x) + p0x*(p1y - p2y) + p1x*p2y);
+	var s = 1/(2*Area)*(p0y*p2x - p0x*p2y + (p2y - p0y)*px + (p0x - p2x)*py);
+	var t = 1/(2*Area)*(p0x*p1y - p0y*p1x + (p0y - p1y)*px + (p1x - p0x)*py);
+	//alert(t + " " + s);
+	return t >= 0 && t <= 1 && s >= 0 && s <= 1 && (t + s) <= 1;	
+}
+function AVLTreeNode(value, tree, height, directions, parent) {
+    this.marked = false;
+    this.clickableRepresentation = null;
+	  this.value = value;
+    this.xLoc = 750;
+    this.yLoc = directions.length * (radius * 2 + 10) + radius;
+    this.tree = tree;
+	  this.height = height;
+    this.directions = directions;
+    this.depth = directions.length;
+    this.left = null;
+    this.right = null;
+    var addend = 375;
+    for (var i = 0; i < directions.length; i++) {
+        this.xLoc += directions[i] * addend;
+        addend /= 2;
+    }
+    this.parent = parent;
+    this.pxLoc = this.xLoc;
+    this.pyLoc = this.yLoc;
+}
+
+function Height(node){
+    if (node!==null) {
+        return node.height;
+    }
+    return -1;
+}
+
+AVLTreeNode.prototype.draw = function(pct) {
+    var x = this.pxLoc * (1 - pct/100) + this.xLoc * pct/100;
+    var y = this.pyLoc * (1 - pct/100) + this.yLoc * pct/100;
+    if (this.left !== null) {
+        var xLeft = this.left.pxLoc * (1 - pct/100) + this.left.xLoc * pct/100;
+        var yLeft = this.left.pyLoc * (1 - pct/100) + this.left.yLoc * pct/100;
+    }
+    if (this.right !== null) {
+        var xRight = this.right.pxLoc * (1 - pct/100) + this.right.xLoc * pct/100;
+        var yRight = this.right.pyLoc * (1 - pct/100) + this.right.yLoc * pct/100;
+    }
+    if (pct == 100) {
+        this.pxLoc = this.xLoc;
+        this.pyLoc = this.yLoc;
+    }
+    if (!drawNone || this.marked) {
+        if (!drawNone) {
+            if (this.left !== null && this.left.depth - 6 < this.tree.graphicalHead.depth) {
+                this.tree.ctx.beginPath();
+                this.tree.ctx.moveTo(x, y);
+                this.tree.ctx.lineTo(xLeft, yLeft);
+                this.tree.ctx.strokeStyle = "#000000";
+                this.tree.ctx.stroke();
+                this.tree.ctx.closePath();
+            }
+            if (this.right !== null && this.right.depth - 6 < this.tree.graphicalHead.depth) {
+                this.tree.ctx.beginPath();
+                this.tree.ctx.moveTo(x, y);
+                this.tree.ctx.lineTo(xRight, yRight);
+                this.tree.ctx.strokeStyle = "#000000";
+                this.tree.ctx.stroke();
+                this.tree.ctx.closePath();
+            }
+        }
+        this.tree.ctx.beginPath();
+        var condition = this.depth - this.tree.graphicalHead.depth < 5 && !(this !== this.tree.head && this === this.tree.graphicalHead);
+        if (condition) {
+            this.tree.ctx.drawImage(canvas2, x - radius, y - radius);
+        } else {
+            if (this.left !== null || this.right !== null) {
+                this.tree.ctx.drawImage(canvas3, x - radius, y - radius);
+            } else {
+                this.tree.ctx.drawImage(canvas4, x - radius, y - radius);
+            }
+        }
+        this.tree.ctx.fillStyle = "#000000";
+        this.tree.ctx.font= (radius * 0.75) + "px Arial";
+        var offset = 0, valueCopy = this.value;
+        while (Math.abs(valueCopy) >= 1) {
+            offset -= radius * 0.2;
+            valueCopy /= 10;
+        }
+        if (valueCopy < 0) {
+            offset -= radius * 0.2;
+        }
+        this.tree.ctx.fillText(this.value, x + offset, y + radius * (condition ? 0.17 : 0.23));
+        this.tree.ctx.closePath();
+    }
+    if (this.left !== null && this.left.depth - 6 < this.tree.graphicalHead.depth) {
+        this.left.draw(pct);
+    }
+    if (this.right !== null && this.right.depth - 6 < this.tree.graphicalHead.depth) {
+        this.right.draw(pct);
+    }
+}
+
+AVLTreeNode.prototype.resetDirections = function(directions) {
+    this.directions = directions.slice(0);
+    this.depth = this.directions.length;
+    this.xLoc = 750;
+    this.yLoc = directions.length * (radius * 2 + 10) + radius;
+    var addend = 375;
+    for (var i = 0; i < directions.length; i++) {
+        this.xLoc += directions[i] * addend;
+        addend /= 2;
+    }
+    if (this.left !== null) {
+        var arr1 = directions.slice(0);
+        arr1.push(-1);
+        this.left.resetDirections(arr1);
+    }
+    if (this.right !== null) {
+        var arr2 = directions.slice(0);
+        arr2.push(1);
+        this.right.resetDirections(arr2);
+    }
+    if (this.depth - this.tree.graphicalHead.depth == 5 || (this === this.tree.graphicalHead && this !== this.tree.head)) {
+      var x1 = 0 + this.xLoc - radius;
+      var y1 = radius * 2 + this.yLoc - radius;
+      var x2 = radius + this.xLoc - radius;
+      var y2 = 0 + this.yLoc - radius;
+      var x3 = radius * 2 + this.xLoc - radius;
+      var y3 = radius * 2 + this.yLoc - radius;
+      if (this.clickableRepresentation === null) {
+          this.clickableRepresentation = new Clickable(x1, y1, x2, y2, x3, y3, this);
+          clickables.push(this.clickableRepresentation);
+      } else {
+          this.clickableRepresentation.x1 = x1;
+          this.clickableRepresentation.x2 = x2;
+          this.clickableRepresentation.x3 = x3;
+          this.clickableRepresentation.y1 = y1;
+          this.clickableRepresentation.y2 = y2;
+          this.clickableRepresentation.y3 = y3;
+      }
+    } else if (this.clickableRepresentation !== null) {
+        var index = -1;
+        for (var i = 0; i < clickables.length; i++) {
+            if (clickables[i] === this.clickableRepresentation) {
+              index = i;
+              break;
+            }
+        }
+        if (index != -1) {
+            clickables.splice(index, 1);
+        }
+        this.clickableRepresentation.node = null;
+        this.clickableRepresentation = null;
+    }
+    if (this.depth > maxDepth) {
+        maxDepth = this.depth;
+        ctx2.beginPath();
+        ctx2.clearRect(0,0,radius * 2, radius * 2);
+        ctx2.closePath();
+        var oldradius = radius;
+        if (maxDepth - this.tree.graphicalHead.depth < 6) radius = radiuses[maxDepth - this.tree.graphicalHead.depth];
+        ctx2.beginPath();
+        var gradient = ctx2.createRadialGradient(radius, radius, 0, radius, radius, radius);
+        gradient.addColorStop(0,"#FFFFFF");
+        gradient.addColorStop(1,"#0000FF");
+        ctx2.fillStyle = gradient;
+        ctx2.arc(radius, radius, radius, 0, 2 * Math.PI);
+        ctx2.fill();
+        ctx2.closePath();
+        ctx3.beginPath();
+        ctx3.clearRect(0,0, oldradius * 2, oldradius * 2);
+        ctx3.closePath();
+        ctx3.beginPath();
+        ctx3.fillStyle = "#00FF00";
+        ctx3.moveTo(0, radius * 2);
+        ctx3.lineTo(radius,0);
+        ctx3.lineTo(radius * 2,radius * 2);
+        ctx3.closePath();
+        ctx3.fill();
+        ctx4.beginPath();
+        ctx4.clearRect(0,0, oldradius * 2, oldradius * 2);
+        ctx4.closePath();
+        ctx4.beginPath();
+        ctx4.fillStyle = "#FF0000";
+        ctx4.moveTo(0, radius * 2);
+        ctx4.lineTo(radius,0);
+        ctx4.lineTo(radius * 2,radius * 2);
+        ctx4.closePath();
+        ctx4.fill();
+        redo = true;
+    }
+}
+
+AVLTreeNode.prototype.Rotate_L = function() {
+    var temp = this.left;
+    this.left = temp.right;
+    if (this.left !== null) this.left.parent = this;
+    temp.right = this;
+    this.height = Math.max(Height(this.right), Height(this.left)) + 1;
+    temp.height = Math.max(Height(temp.right), Height(this)) + 1;
+    if (this.parent !== null) {
+        if (this.parent.left === this) {
+            this.parent.left = temp;
+        } else if (this.parent.right === this) {
+            this.parent.right = temp;
+        }
+    }
+    temp.parent = this.parent;
+    this.parent = temp;
+    return temp;
+}
+
+AVLTreeNode.prototype.Rotate_R = function() {
+    var temp = this.right;
+    this.right = temp.left;
+    if (this.right !== null) this.right.parent = this;
+    temp.left = this;
+    this.height = Math.max(Height(this.right), Height(this.left)) + 1;
+    temp.height = Math.max(Height(temp.right), Height(this)) + 1;
+    if (this.parent !== null) {
+        if (this.parent.left === this) {
+            this.parent.left = temp;
+        } else if (this.parent.right === this) {
+            this.parent.right = temp;
+        }
+    }
+    temp.parent = this.parent;
+    this.parent = temp;
+    return temp;
+}
+
+AVLTreeNode.prototype.Rotate_LR = function() {
+    this.right.Rotate_L();
+    return this.Rotate_R();
+}
+
+AVLTreeNode.prototype.Rotate_RL = function() {
+    this.left.Rotate_R();
+    return this.Rotate_L();
+}
+
+AVLTreeNode.prototype.insert = function(value) {
+    if (value < this.value) {
+        if (this.left !== null) {
+            this.left.insert(value);
+        } else {
+            var dirs1 = this.directions.slice(0);
+            dirs1.push(-1);
+            this.left = new AVLTreeNode(value, this.tree, 0, dirs1, this);
+        }        
+    } else if (value > this.value) {
+        if (this.right !== null) {
+            this.right.insert(value);
+        } else {
+            var dirs2 = this.directions.slice(0);
+            dirs2.push(1);
+            this.right = new AVLTreeNode(value, this.tree, 0, dirs2, this);
+        }
+    }
+    var potentialHead = null;
+    if (Height(this.left) - Height(this.right) == 2) {
+        if (value < this.left.value) {
+            potentialHead = this.Rotate_L();
+        } else {
+            potentialHead = this.Rotate_RL();
+        }
+    } else if (Height(this.right) - Height(this.left) == 2) {
+        if (value > this.right.value) {
+            potentialHead = this.Rotate_R();
+        } else {
+            potentialHead = this.Rotate_LR();
+        }
+    }
+    if (potentialHead !== null && potentialHead.parent === null) {
+        this.tree.head = potentialHead;
+    }
+    if (this === this.tree.graphicalHead && potentialHead !== null) {
+        this.tree.graphicalHead = potentialHead;
+    }
+    this.height = Math.max(Height(this.left), Height(this.right)) + 1;
+    /* If the value is exactly equal to this node's value, 
+       the tree already contains the number, so don't do anything.*/
+}
+
+function AVLTree(canvasContext) {
+    this.head = null;
+    this.graphicalHead = null;
+    this.ctx = canvasContext;
+}
+
+AVLTree.prototype.insert = function(value) {
+    if (this.head === null) {
+        this.head = new AVLTreeNode(value, this, 0, [], null);
+        this.graphicalHead = this.head;
+    } else {
+        this.head.insert(value);
+        redo = false;
+        this.graphicalHead.resetDirections([]);
+        if (redo) this.graphicalHead.resetDirections([]);
+    }
+}
+
+AVLTree.prototype.draw = function(pct) {
+    if (this.head !== null) {
+        this.graphicalHead.draw(pct);
+    }
+}
+
+function doSetTimeout(pct) {
+    setTimeout(function() {
+        tree.ctx.beginPath();
+        tree.ctx.fillStyle = "#FFFFFF";
+        tree.ctx.fillRect(0,0,canvas.width,canvas.height);
+        tree.ctx.closePath();
+        tree.draw(pct);
+    }, pct * 7);
+}
+
+function eraseMark(clickableNode) {
+    setTimeout(function() {
+        clickableNode.marked = false;
+        drawNone = false;
+    }, 1000);
+}
+
+function insertNewValue() {
+    var index = Math.floor(bigArray.length * Math.random());
+    var value = bigArray.splice(Math.min(index, bigArray.length - 1),1)[0];
+    tree.insert(value);
+    for (var pct = 0; pct <= 100; pct++) {
+          doSetTimeout(pct);
+    }
+}
+
+function LoadAnimation() {
+    document.body.onclick = function (e) {
+        e = e || window.event;
+        var rect = canvas.getBoundingClientRect();
+        var b = $("body:first");
+        for (var i = 0; i < clickables.length; i++) {
+            if (clickables[i].isClicked(e.pageX - rect.left - b.scrollLeft(), e.pageY - rect.top - b.scrollTop())) {
+                if (clickables[i].node !== tree.graphicalHead) {
+                    my_click = clickables[i];
+                    /*if (tree.graphicalHead.clickableRepresentation !== null) {
+                        tree.graphicalHead.clickableRepresentation.node = null;
+                        for (var j = 0; j < clickables.length; j++) {
+                            var index = -1;
+                            if (clickables[j] === tree.graphicalHead.clickableRepresentation) {
+                                index = j;
+                            }
+                            if (index != -1) {
+                                clickables.splice(index);
+                            }
+                        }
+                    }*/
+                    tree.graphicalHead.clickableRepresentation = null;
+                    tree.graphicalHead = my_click.node;
+                    my_click.node.marked = true;
+                    tree.graphicalHead.resetDirections([]);
+                    eraseMark(my_click.node);
+                    drawNone = true;
+                    if (done) {
+                        setTimeout(function() {
+                          for (var pct = 0; pct <= 100; pct++) {
+                              doSetTimeout(pct);
+                          }
+                        }, 1000);
+                    }
+                } else {
+                    /*tree.graphicalHead.clickableRepresentation.node = null;
+                    for (var j = 0; j < clickables.length; j++) {
+                        var index = -1;
+                        if (clickables[j] === tree.graphicalHead.clickableRepresentation) {
+                            index = j;
+                        }
+                        if (index != -1) {
+                            clickables.splice(index);
+                        }
+                    }
+                    tree.graphicalHead.clickableRepresentation = null;*/
+                    tree.graphicalHead = clickables[i].node.parent.parent.parent.parent.parent;
+                    clickables[i].node.marked = true;
+                    tree.graphicalHead.resetDirections([]);
+                    eraseMark(clickables[i].node);
+                    drawNone = true;
+                    if (done) {
+                        setTimeout(function() {
+                          for (var pct = 0; pct <= 100; pct++) {
+                              doSetTimeout(pct);
+                          }
+                        }, 1000);
+                    }
+                }
+            } 
+        }
+    }
+    canvas2 = document.createElement('canvas');
+    canvas3 = document.createElement('canvas');
+    canvas4 = document.createElement('canvas');
+    canvas3.width = 80;
+    canvas3.height = 80;
+    canvas2.width = 80;
+    canvas2.height = 80;
+    canvas4.width = 80;
+    canvas4.height = 80;
+    //document.body.appendChild(canvas2);
+    ctx2 = canvas2.getContext("2d");
+    ctx3 = canvas3.getContext("2d");
+    ctx4 = canvas4.getContext("2d");
+    ctx3.beginPath();
+    ctx3.fillStyle = "#00FF00";
+    ctx3.moveTo(0, radius * 2);
+    ctx3.lineTo(radius,0);
+    ctx3.lineTo(radius * 2,radius * 2);
+    ctx3.closePath();
+    ctx3.fill();
+    ctx4.beginPath();
+    ctx4.fillStyle = "#FF0000";
+    ctx4.moveTo(0, radius * 2);
+    ctx4.lineTo(radius,0);
+    ctx4.lineTo(radius * 2,radius * 2);
+    ctx4.closePath();
+    ctx4.fill();
+    ctx2.beginPath();
+    var gradient = ctx2.createRadialGradient(radius, radius, 0, radius, radius, radius);
+    gradient.addColorStop(0,"#FFFFFF");
+    gradient.addColorStop(1,"#0000FF");
+    ctx2.fillStyle = gradient;
+    ctx2.arc(radius, radius, radius, 0, 2 * Math.PI);
+    ctx2.fill();
+    ctx2.closePath();
+    canvas = document.getElementById("myCanvas");
+    var ctx = canvas.getContext("2d");
+    tree = new AVLTree(ctx);
+    for (var i = 1; i <= 60; i++) {
+        setTimeout(function() {
+            insertNewValue();
+        }, 1000 * i);
+    }
+    setTimeout(function() {done = true;}, 60000);
+}
+
+</script>
+</head>
+<body onload="LoadAnimation()">
+<canvas id="myCanvas" width="1500" height="750" style="border:none" />
+</body>
+</html>
