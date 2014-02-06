@@ -23,6 +23,9 @@ var redo = false;
 var clickables = [];
 var done = false;
 var drawNone = false;
+var image1 = new Image();
+var image2 = new Image();
+var image3 = new Image();
 for (var i = 0; i < 10000; i++) {
     bigArray.push(i);
 }
@@ -81,6 +84,41 @@ function Height(node){
     return -1;
 }
 
+function draw(condition, ctx, x, y, left, right) {
+    if (condition) {
+        ctx.drawImage(image1, x - radius, y - radius);
+    } else {
+        if (left !== null || right !== null) {
+            ctx.drawImage(image2, x - radius, y - radius);
+        } else {
+            ctx.drawImage(image3, x - radius, y - radius);
+        }
+    }
+}
+
+AVLTreeNode.prototype.drawLines = function(x, y, xLeft, yLeft, xRight, yRight) {
+    if (this.left !== null && this.left.depth - 6 < this.tree.graphicalHead.depth) {
+        this.tree.ctx.beginPath();
+        this.tree.ctx.moveTo(x, y);
+        this.tree.ctx.lineTo(xLeft, yLeft);
+        this.tree.ctx.strokeStyle = "#000000";
+        this.tree.ctx.stroke();
+        this.tree.ctx.closePath();
+    }
+    if (this.right !== null && this.right.depth - 6 < this.tree.graphicalHead.depth) {
+        this.tree.ctx.beginPath();
+        this.tree.ctx.moveTo(x, y);
+        this.tree.ctx.lineTo(xRight, yRight);
+        this.tree.ctx.strokeStyle = "#000000";
+        this.tree.ctx.stroke();
+        this.tree.ctx.closePath();
+    }
+}
+
+function drawText(ctx, condition, x, y, offset, value) {
+    ctx.fillText(value, x + offset, y + radius * (condition ? 0.17 : 0.23));
+}
+
 AVLTreeNode.prototype.draw = function(pct) {
     var x = this.pxLoc * (1 - pct/100) + this.xLoc * pct/100;
     var y = this.pyLoc * (1 - pct/100) + this.yLoc * pct/100;
@@ -98,36 +136,11 @@ AVLTreeNode.prototype.draw = function(pct) {
     }
     if (!drawNone || this.marked) {
         if (!drawNone) {
-            if (this.left !== null && this.left.depth - 6 < this.tree.graphicalHead.depth) {
-                this.tree.ctx.beginPath();
-                this.tree.ctx.moveTo(x, y);
-                this.tree.ctx.lineTo(xLeft, yLeft);
-                this.tree.ctx.strokeStyle = "#000000";
-                this.tree.ctx.stroke();
-                this.tree.ctx.closePath();
-            }
-            if (this.right !== null && this.right.depth - 6 < this.tree.graphicalHead.depth) {
-                this.tree.ctx.beginPath();
-                this.tree.ctx.moveTo(x, y);
-                this.tree.ctx.lineTo(xRight, yRight);
-                this.tree.ctx.strokeStyle = "#000000";
-                this.tree.ctx.stroke();
-                this.tree.ctx.closePath();
-            }
+            this.drawLines(x, y, xLeft, yLeft, xRight, yRight);
         }
         this.tree.ctx.beginPath();
         var condition = this.depth - this.tree.graphicalHead.depth < 5 && !(this !== this.tree.head && this === this.tree.graphicalHead);
-        if (condition) {
-            this.tree.ctx.drawImage(canvas2, x - radius, y - radius);
-        } else {
-            if (this.left !== null || this.right !== null) {
-                this.tree.ctx.drawImage(canvas3, x - radius, y - radius);
-            } else {
-                this.tree.ctx.drawImage(canvas4, x - radius, y - radius);
-            }
-        }
-        this.tree.ctx.fillStyle = "#000000";
-        this.tree.ctx.font= (radius * 0.75) + "px Arial";
+        draw(condition, this.tree.ctx, x, y, this.left, this.right);
         var offset = 0, valueCopy = this.value;
         while (Math.abs(valueCopy) >= 1) {
             offset -= radius * 0.2;
@@ -136,7 +149,7 @@ AVLTreeNode.prototype.draw = function(pct) {
         if (valueCopy < 0) {
             offset -= radius * 0.2;
         }
-        this.tree.ctx.fillText(this.value, x + offset, y + radius * (condition ? 0.17 : 0.23));
+        drawText(this.tree.ctx, condition, x, y, offset, this.value);
         this.tree.ctx.closePath();
     }
     if (this.left !== null && this.left.depth - 6 < this.tree.graphicalHead.depth) {
@@ -234,6 +247,9 @@ AVLTreeNode.prototype.resetDirections = function(directions) {
         ctx4.lineTo(radius * 2,radius * 2);
         ctx4.closePath();
         ctx4.fill();
+        image1.src = canvas2.toDataURL("image/png");
+        image2.src = canvas3.toDataURL("image/png");
+        image3.src = canvas4.toDataURL("image/png");
         redo = true;
     }
 }
@@ -359,22 +375,24 @@ function doSetTimeout(pct) {
         tree.ctx.fillStyle = "#FFFFFF";
         tree.ctx.fillRect(0,0,canvas.width,canvas.height);
         tree.ctx.closePath();
+        tree.ctx.fillStyle = "#000000";
+        tree.ctx.font= (radius * 0.75) + "px Monospace";
         tree.draw(pct);
-    }, pct * 7);
+    }, pct * 3.5);
 }
 
 function eraseMark(clickableNode) {
     setTimeout(function() {
         clickableNode.marked = false;
         drawNone = false;
-    }, 1000);
+    }, 500);
 }
 
 function insertNewValue() {
     var index = Math.floor(bigArray.length * Math.random());
     var value = bigArray.splice(Math.min(index, bigArray.length - 1),1)[0];
     tree.insert(value);
-    for (var pct = 0; pct <= 100; pct++) {
+    for (var pct = 0; pct <= 100; pct += 5) {
           doSetTimeout(pct);
     }
 }
@@ -476,15 +494,18 @@ function LoadAnimation() {
     ctx2.arc(radius, radius, radius, 0, 2 * Math.PI);
     ctx2.fill();
     ctx2.closePath();
+    image1.src = canvas2.toDataURL("image/png");
+    image2.src = canvas3.toDataURL("image/png");
+    image3.src = canvas4.toDataURL("image/png");
     canvas = document.getElementById("myCanvas");
     var ctx = canvas.getContext("2d");
     tree = new AVLTree(ctx);
-    for (var i = 1; i <= 60; i++) {
+    for (var i = 1; i <= 1000; i++) {
         setTimeout(function() {
             insertNewValue();
-        }, 1000 * i);
+        }, 500 * i);
     }
-    setTimeout(function() {done = true;}, 60000);
+    setTimeout(function() {done = true;}, 500000);
 }
 
 </script>
