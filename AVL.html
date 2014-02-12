@@ -21,11 +21,14 @@ var ctx3 = null;
 var ctx4 = null;
 var redo = false;
 var clickables = [];
-var done = false;
 var drawNone = false;
 var image1 = new Image();
 var image2 = new Image();
 var image3 = new Image();
+var interval = null;
+var interval2 = null;
+var pct = 0;
+var listenToClick = true;
 for (var i = 0; i < 10000; i++) {
     bigArray.push(i);
 }
@@ -369,8 +372,8 @@ AVLTree.prototype.draw = function(pct) {
     }
 }
 
-function doSetTimeout(pct) {
-    setTimeout(function() {
+function doSetTimeout() {
+    interval2 = setInterval(function() {
         tree.ctx.beginPath();
         tree.ctx.fillStyle = "#FFFFFF";
         tree.ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -378,23 +381,27 @@ function doSetTimeout(pct) {
         tree.ctx.fillStyle = "#000000";
         tree.ctx.font= (radius * 0.75) + "px Monospace";
         tree.draw(pct);
-    }, pct * 3.5);
+        pct += 5;
+        if (pct === 105) {
+            pct = 0;
+            clearInterval(interval2);
+            interval2 = null;
+        }
+    }, 18);
 }
 
-function eraseMark(clickableNode) {
+function eraseMark(clickableNode, milliseconds) {
     setTimeout(function() {
         clickableNode.marked = false;
         drawNone = false;
-    }, 500);
+    }, milliseconds);
 }
 
 function insertNewValue() {
     var index = Math.floor(bigArray.length * Math.random());
     var value = bigArray.splice(Math.min(index, bigArray.length - 1),1)[0];
     tree.insert(value);
-    for (var pct = 0; pct <= 100; pct += 5) {
-          doSetTimeout(pct);
-    }
+    doSetTimeout();
 }
 
 function LoadAnimation() {
@@ -402,61 +409,58 @@ function LoadAnimation() {
         e = e || window.event;
         var rect = canvas.getBoundingClientRect();
         var b = $("body:first");
-        for (var i = 0; i < clickables.length; i++) {
-            if (clickables[i].isClicked(e.pageX - rect.left - b.scrollLeft(), e.pageY - rect.top - b.scrollTop())) {
-                if (clickables[i].node !== tree.graphicalHead) {
-                    my_click = clickables[i];
-                    /*if (tree.graphicalHead.clickableRepresentation !== null) {
-                        tree.graphicalHead.clickableRepresentation.node = null;
-                        for (var j = 0; j < clickables.length; j++) {
-                            var index = -1;
-                            if (clickables[j] === tree.graphicalHead.clickableRepresentation) {
-                                index = j;
-                            }
-                            if (index != -1) {
-                                clickables.splice(index);
-                            }
+        if (listenToClick) {
+            for (var i = 0; i < clickables.length; i++) {
+                if (clickables[i].isClicked(e.pageX - rect.left - b.scrollLeft(), e.pageY - rect.top - b.scrollTop())) {
+                    if (clickables[i].node !== tree.graphicalHead) {
+                        my_click = clickables[i];
+                        tree.graphicalHead.clickableRepresentation = null;
+                        tree.graphicalHead = my_click.node;
+                        my_click.node.marked = true;
+                        tree.graphicalHead.resetDirections([]);
+                        eraseMark(my_click.node, 500);
+                        drawNone = true;
+                        clearInterval(interval);
+                        if (interval2 !== null) {
+                            clearInterval(interval2);
+                            interval2 = null;
                         }
-                    }*/
-                    tree.graphicalHead.clickableRepresentation = null;
-                    tree.graphicalHead = my_click.node;
-                    my_click.node.marked = true;
-                    tree.graphicalHead.resetDirections([]);
-                    eraseMark(my_click.node);
-                    drawNone = true;
-                    if (done) {
                         setTimeout(function() {
-                          for (var pct = 0; pct <= 100; pct++) {
-                              doSetTimeout(pct);
-                          }
-                        }, 1000);
-                    }
-                } else {
-                    /*tree.graphicalHead.clickableRepresentation.node = null;
-                    for (var j = 0; j < clickables.length; j++) {
-                        var index = -1;
-                        if (clickables[j] === tree.graphicalHead.clickableRepresentation) {
-                            index = j;
-                        }
-                        if (index != -1) {
-                            clickables.splice(index);
-                        }
-                    }
-                    tree.graphicalHead.clickableRepresentation = null;*/
-                    tree.graphicalHead = clickables[i].node.parent.parent.parent.parent.parent;
-                    clickables[i].node.marked = true;
-                    tree.graphicalHead.resetDirections([]);
-                    eraseMark(clickables[i].node);
-                    drawNone = true;
-                    if (done) {
+                            interval = setInterval(function() {
+                                insertNewValue();
+                            }, 500);
+                        }, 500);
+                        pct = 0;
+                        doSetTimeout();
+                        listenToClick = false;
                         setTimeout(function() {
-                          for (var pct = 0; pct <= 100; pct++) {
-                              doSetTimeout(pct);
-                          }
-                        }, 1000);
+                            listenToClick = true;
+                        }, 600);
+                    } else {
+                        tree.graphicalHead = clickables[i].node.parent.parent.parent.parent.parent;
+                        clickables[i].node.marked = true;
+                        tree.graphicalHead.resetDirections([]);
+                        eraseMark(clickables[i].node, 500);
+                        drawNone = true;
+                        clearInterval(interval);
+                        if (interval2 !== null) {
+                            clearInterval(interval2);
+                            interval2 = null;
+                        }
+                        setTimeout(function() {
+                            interval = setInterval(function() {
+                                insertNewValue();
+                            }, 500);
+                        }, 500);
+                        pct = 0;
+                        doSetTimeout();
+                        listenToClick = false;
+                        setTimeout(function() {
+                            listenToClick = true;
+                        }, 600);
                     }
-                }
-            } 
+                } 
+            }
         }
     }
     canvas2 = document.createElement('canvas');
@@ -500,12 +504,9 @@ function LoadAnimation() {
     canvas = document.getElementById("myCanvas");
     var ctx = canvas.getContext("2d");
     tree = new AVLTree(ctx);
-    for (var i = 1; i <= 1000; i++) {
-        setTimeout(function() {
-            insertNewValue();
-        }, 500 * i);
-    }
-    setTimeout(function() {done = true;}, 500000);
+    interval = setInterval(function() {
+        insertNewValue();
+    }, 500);
 }
 
 </script>
